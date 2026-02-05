@@ -842,3 +842,412 @@ class ImageProcessorApp:
         
         return panel
 
+
+
+    #...................................................................
+    
+    def _setup_status_bar(self) -> None:
+  
+        status_frame = ttk.Frame(self.root, relief=tk.SUNKEN, borderwidth=1)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+
+        self.status_bar = ttk.Label(status_frame, text="Ready", anchor=tk.W)
+        self.status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+ 
+        self.zoom_label = ttk.Label(status_frame, text="100%", width=8)
+        self.zoom_label.pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Separator(status_frame, orient=tk.VERTICAL).pack(side=tk.RIGHT, fill=tk.Y, padx=2)
+        
+
+        self.history_position_label = ttk.Label(status_frame, text="", width=10)
+        self.history_position_label.pack(side=tk.RIGHT, padx=5)
+        
+        ttk.Separator(status_frame, orient=tk.VERTICAL).pack(side=tk.RIGHT, fill=tk.Y, padx=2)
+        
+       
+        self.memory_label = ttk.Label(status_frame, text="", width=15)
+        self.memory_label.pack(side=tk.RIGHT, padx=5)
+    
+    def _bind_shortcuts(self) -> None:
+        """Bind keyboard shortcuts for quick access."""
+        shortcuts = {
+            '<Control-o>': lambda e: self.open_image(),
+            '<Control-s>': lambda e: self.save_image(),
+            '<Control-Shift-S>': lambda e: self.save_as_image(),
+            '<Control-z>': lambda e: self.undo(),
+            '<Control-y>': lambda e: self.redo(),
+            '<Control-r>': lambda e: self.reset_image(),
+            '<Control-plus>': lambda e: self.zoom_in(),
+            '<Control-minus>': lambda e: self.zoom_out(),
+            '<Control-0>': lambda e: self.fit_to_window(),
+            '<F1>': lambda e: self.show_user_guide(),
+        }
+        
+        for key, command in shortcuts.items():
+            self.root.bind(key, command)
+    
+    def _show_welcome_message(self) -> None:
+       
+        self._update_info_panel(
+            "Welcome to image processing studio by group 37"
+        )
+    
+    #Display Methods 
+    
+    def display_image(self) -> None:
+        """Display the current image on canvas with zoom support."""
+        image = self.processor.get_current_image()
+        if image is None:
+            return
+        
+
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+     
+        if self.zoom_level != 1.0:
+            new_width = int(image_rgb.shape[1] * self.zoom_level)
+            new_height = int(image_rgb.shape[0] * self.zoom_level)
+            image_rgb = cv2.resize(image_rgb, (new_width, new_height), 
+                                  interpolation=cv2.INTER_LINEAR)
+        
+   
+        pil_image = Image.fromarray(image_rgb)
+        
+  
+        self.photo = ImageTk.PhotoImage(pil_image)
+        
+    
+        self.canvas.delete("all")
+        
+      
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo, tags="image")
+        self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
+        
+   
+        self.update_status()
+        self.update_image_info()
+        self.update_history_display()
+        self.zoom_label.config(text=f"{int(self.zoom_level * 100)}%")
+    
+    def update_status(self, message: Optional[str] = None) -> None:
+       
+        if message:
+            self.status_bar.config(text=message)
+            self._log_message(message)
+        else:
+            info = self.processor.get_image_info()
+            if info:
+                status_text = (f"File: {info['filename']} | "
+                             f"{info['width']}×{info['height']}px | "
+                             f"{info['channels']} channels | "
+                             f"{info['memory_size'] / 1024 / 1024:.2f} MB")
+                self.status_bar.config(text=status_text)
+            else:
+                self.status_bar.config(text="Ready")
+        
+  
+        if self.processor.get_current_image() is not None:
+            current, total = self.history.get_current_position()
+            self.history_position_label.config(text=f"{current}/{total}")
+            
+    
+            memory_mb = self.history.get_memory_usage() / 1024 / 1024
+            self.memory_label.config(text=f"History: {memory_mb:.1f} MB")
+    
+    def update_image_info(self) -> None:
+
+        info = self.processor.get_image_info()
+        if info:
+            info_text = f"""Image Information
+{'=' * 40}
+Filename: {info['filename']}
+Dimensions: {info['width']} × {info['height']} pixels
+Channels: {info['channels']}
+Total Pixels: {info['total_pixels']:,}
+Memory Size: {info['memory_size'] / 1024 / 1024:.2f} MB
+Data Type: {info['dtype']}
+
+"""
+            if info.get('original_dimensions'):
+                orig_w, orig_h = info['original_dimensions']
+                info_text += f"Original Size: {orig_w} × {orig_h} pixels\n"
+            
+            if info.get('file_size'):
+                info_text += f"File Size: {info['file_size'] / 1024:.2f} KB\n"
+            
+            if info.get('load_time'):
+                info_text += f"Loaded: {info['load_time'].strftime('%Y-%m-%d %H:%M:%S')}\n"
+            
+            self._update_info_panel(info_text)
+    
+    def update_history_display(self) -> None:
+
+        self.history_listbox.delete(0, tk.END)
+        
+        history_list = self.history.get_history_list()
+        current, total = self.history.get_current_position()
+        
+        for i, operation in enumerate(history_list):
+            marker = "→ " if i == current - 1 else "  "
+            self.history_listbox.insert(tk.END, f"{marker}{i + 1}. {operation}")
+            
+            if i == current - 1:
+                self.history_listbox.itemconfig(i, bg='lightblue')
+    
+    def _update_info_panel(self, text: str) -> None:
+        """Update the info panel with new text."""
+        self.info_panel.config(state='normal')
+        self.info_panel.delete(1.0, tk.END)
+        self.info_panel.insert(1.0, text)
+        self.info_panel.config(state='disabled')
+    
+    def _log_message(self, message: str) -> None:
+        """Add a message to the processing log."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {message}\n"
+        
+        self.log_panel.config(state='normal')
+        self.log_panel.insert(tk.END, log_entry)
+        self.log_panel.see(tk.END)
+        self.log_panel.config(state='disabled')
+    
+    def save_to_history(self, operation_name: str = "Operation") -> None:
+        """Save current image state to history."""
+        image = self.processor.get_current_image()
+        if image is not None:
+            self.history.add_state(image, operation_name)
+            self.is_modified = True
+    
+    
+    def open_image(self) -> None:
+    
+        if self.is_modified:
+            response = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before opening a new image?"
+            )
+            if response is None:  # Cancel
+                return
+            elif response:  # Yes
+                self.save_image()
+        
+        filetypes = [
+            ("All Supported Images", "*.jpg *.jpeg *.png *.bmp *.tiff *.gif"),
+            ("JPEG Images", "*.jpg *.jpeg"),
+            ("PNG Images", "*.png"),
+            ("BMP Images", "*.bmp"),
+            ("TIFF Images", "*.tiff *.tif"),
+            ("GIF Images", "*.gif"),
+            ("All Files", "*.*")
+        ]
+        
+        filepath = filedialog.askopenfilename(
+            title="Select an Image",
+            filetypes=filetypes
+        )
+        
+        if filepath:
+            try:
+                self.processor.load_image(filepath)
+                self.current_filepath = filepath
+                self.history.clear()
+                self.save_to_history("Image loaded")
+                self.zoom_level = 1.0
+                self.display_image()
+                self.update_status(f"Loaded: {os.path.basename(filepath)}")
+                self.is_modified = False
+                self._log_message(f"Successfully loaded: {filepath}")
+            except FileNotFoundError:
+                messagebox.showerror("Error", "File not found")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to load image:\n{str(e)}")
+                self._log_message(f"Error loading image: {str(e)}")
+    
+    def save_image(self) -> None:
+       
+        if self.processor.get_current_image() is None:
+            messagebox.showwarning("Warning", "No image to save")
+            return
+        
+        if self.current_filepath:
+            try:
+                self.processor.save_image(self.current_filepath, quality=95)
+                self.update_status(f"Saved: {os.path.basename(self.current_filepath)}")
+                messagebox.showinfo("Success", "Image saved successfully!")
+                self.is_modified = False
+                self._log_message(f"Saved to: {self.current_filepath}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save image:\n{str(e)}")
+                self._log_message(f"Error saving: {str(e)}")
+        else:
+            self.save_as_image()
+    
+    def save_as_image(self) -> None:
+        """Save the image with a new filename."""
+        if self.processor.get_current_image() is None:
+            messagebox.showwarning("Warning", "No image to save")
+            return
+        
+        filetypes = [
+            ("PNG Image", "*.png"),
+            ("JPEG Image", "*.jpg"),
+            ("BMP Image", "*.bmp"),
+            ("TIFF Image", "*.tiff"),
+            ("All Files", "*.*")
+        ]
+        
+        filepath = filedialog.asksaveasfilename(
+            title="Save Image As",
+            defaultextension=".png",
+            filetypes=filetypes
+        )
+        
+        if filepath:
+            try:
+                self.processor.save_image(filepath, quality=95)
+                self.current_filepath = filepath
+                self.update_status(f"Saved: {os.path.basename(filepath)}")
+                messagebox.showinfo("Success", "Image saved successfully!")
+                self.is_modified = False
+                self._log_message(f"Saved as: {filepath}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save image:\n{str(e)}")
+                self._log_message(f"Error saving: {str(e)}")
+    
+    def export_image(self) -> None:
+       
+        if self.processor.get_current_image() is None:
+            messagebox.showwarning("Warning", "No image to export")
+            return
+        
+        export_dialog = tk.Toplevel(self.root)
+        export_dialog.title("Export Options")
+        export_dialog.geometry("400x250")
+        export_dialog.transient(self.root)
+        export_dialog.grab_set()
+        
+        ttk.Label(export_dialog, text="Export Settings", 
+                 font=('Arial', 12, 'bold')).pack(pady=10)
+        
+
+        format_frame = ttk.Frame(export_dialog)
+        format_frame.pack(fill=tk.X, padx=20, pady=5)
+        ttk.Label(format_frame, text="Format:").pack(side=tk.LEFT)
+        format_var = tk.StringVar(value="PNG")
+        format_combo = ttk.Combobox(format_frame, textvariable=format_var,
+                                   values=["PNG", "JPEG", "BMP", "TIFF"],
+                                   state='readonly', width=15)
+        format_combo.pack(side=tk.RIGHT)
+        
+
+        quality_frame = ttk.Frame(export_dialog)
+        quality_frame.pack(fill=tk.X, padx=20, pady=5)
+        ttk.Label(quality_frame, text="Quality (JPEG):").pack(side=tk.LEFT)
+        quality_var = tk.IntVar(value=95)
+        quality_slider = ttk.Scale(quality_frame, from_=1, to=100, 
+                                  variable=quality_var, orient=tk.HORIZONTAL)
+        quality_slider.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0))
+        
+        quality_label = ttk.Label(export_dialog, text="95%")
+        quality_label.pack()
+        
+        def update_quality_label(val):
+            quality_label.config(text=f"{int(float(val))}%")
+        
+        quality_slider.config(command=update_quality_label)
+        
+        def do_export():
+            format_ext = format_var.get().lower()
+            if format_ext == "jpeg":
+                format_ext = "jpg"
+            
+            filepath = filedialog.asksaveasfilename(
+                title="Export Image",
+                defaultextension=f".{format_ext}",
+                filetypes=[(f"{format_var.get()} Image", f"*.{format_ext}")]
+            )
+            
+            if filepath:
+                try:
+                    quality = quality_var.get() if format_ext == "jpg" else 95
+                    self.processor.save_image(filepath, quality=quality)
+                    messagebox.showinfo("Success", f"Image exported successfully to:\n{filepath}")
+                    export_dialog.destroy()
+                    self._log_message(f"Exported to: {filepath}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+        
+        # Buttons
+        button_frame = ttk.Frame(export_dialog)
+        button_frame.pack(pady=20)
+        ttk.Button(button_frame, text="Export", command=do_export).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", 
+                  command=export_dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def exit_app(self) -> None:
+        if self.is_modified:
+            response = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before exiting?"
+            )
+            if response is None:  # Cancel
+                return
+            elif response:  # Yes
+                self.save_image()
+        
+        self.root.quit()
+    
+    # Edit Operations
+    
+    def undo(self) -> None:
+   
+        if self.history.can_undo():
+            result = self.history.undo()
+            if result:
+                image, operation = result
+                self.processor.current_image = image
+                self.display_image()
+                self.update_status(f"Undone: {operation}")
+                self._log_message(f"Undo: {operation}")
+        else:
+            self.update_status("Nothing to undo")
+    
+    def redo(self) -> None:
+       
+        if self.history.can_redo():
+            result = self.history.redo()
+            if result:
+                image, operation = result
+                self.processor.current_image = image
+                self.display_image()
+                self.update_status(f"Redone: {operation}")
+                self._log_message(f"Redo: {operation}")
+        else:
+            self.update_status("Nothing to redo")
+    
+    def reset_image(self) -> None:
+    
+        if self.processor.original_image is not None:
+            if messagebox.askyesno("Reset Image", 
+                                  "Reset to original image? This will clear all edits."):
+                self.processor.reset_to_original()
+                self.save_to_history("Reset to original")
+                self.display_image()
+                self.update_status("Reset to original image")
+                self._log_message("Image reset to original")
+    
+    def clear_history(self) -> None:
+       
+        if messagebox.askyesno("Clear History", 
+                              "Clear all history? This cannot be undone."):
+            self.history.clear()
+            if self.processor.get_current_image() is not None:
+                self.save_to_history("History cleared")
+            self.update_history_display()
+            self.update_status("History cleared")
+            self._log_message("History cleared")
+            
+
