@@ -1251,3 +1251,329 @@ Data Type: {info['dtype']}
             self._log_message("History cleared")
             
 
+# Image pocessing oprations 
+    
+     def apply_grayscale(self) -> None:
+
+        if self.check_image_loaded():
+            self.save_to_history("Grayscale")
+            self.processor.convert_to_grayscale()
+            self.display_image()
+            self.update_status("Applied grayscale conversion")
+    
+    def apply_blur(self) -> None:
+      
+        if self.check_image_loaded():
+            intensity = int(self.blur_slider.get())
+            self.save_to_history(f"Blur ({intensity})")
+            self.processor.apply_blur(intensity)
+            self.display_image()
+            self.update_status(f"Applied blur (intensity: {intensity})")
+    
+    def apply_edge_detection(self) -> None:
+   
+        if self.check_image_loaded():
+            self.save_to_history("Edge Detection")
+            self.processor.detect_edges()
+            self.display_image()
+            self.update_status("Applied edge detection")
+    
+    def apply_brightness(self) -> None:
+   
+        if self.check_image_loaded():
+            value = int(self.brightness_slider.get())
+            self.save_to_history(f"Brightness ({value:+d})")
+            self.processor.adjust_brightness(value)
+            self.display_image()
+            self.update_status(f"Adjusted brightness ({value:+d})")
+    
+    def apply_contrast(self) -> None:
+  
+        if self.check_image_loaded():
+            value = float(self.contrast_slider.get())
+            self.save_to_history(f"Contrast ({value:.1f}x)")
+            self.processor.adjust_contrast(value)
+            self.display_image()
+            self.update_status(f"Adjusted contrast ({value:.1f}x)")
+    
+    def apply_saturation(self) -> None:
+      
+        if self.check_image_loaded():
+            value = float(self.saturation_slider.get())
+            self.save_to_history(f"Saturation ({value:.1f}x)")
+            self.processor.adjust_saturation(value)
+            self.display_image()
+            self.update_status(f"Adjusted saturation ({value:.1f}x)")
+    
+    def apply_sharpen(self) -> None:
+    
+        if self.check_image_loaded():
+            self.save_to_history("Sharpen")
+            self.processor.apply_sharpen()
+            self.display_image()
+            self.update_status("Applied sharpening filter")
+    
+    def apply_emboss(self) -> None:
+    
+        if self.check_image_loaded():
+            self.save_to_history("Emboss")
+            self.processor.apply_emboss()
+            self.display_image()
+            self.update_status("Applied emboss effect")
+    
+    def apply_sepia(self) -> None:
+ 
+        if self.check_image_loaded():
+            self.save_to_history("Sepia Tone")
+            self.processor.apply_sepia()
+            self.display_image()
+            self.update_status("Applied sepia tone")
+    
+    def apply_negative(self) -> None:
+
+        if self.check_image_loaded():
+            self.save_to_history("Negative")
+            self.processor.apply_negative()
+            self.display_image()
+            self.update_status("Applied negative effect")
+    
+    def rotate_image(self, angle: int) -> None:
+     
+        if self.check_image_loaded():
+            self.save_to_history(f"Rotate {angle}°")
+            self.processor.rotate_image(angle)
+            self.display_image()
+            self.update_status(f"Rotated {angle}°")
+    
+    def flip_image(self, direction: str) -> None:
+       
+        if self.check_image_loaded():
+            self.save_to_history(f"Flip {direction}")
+            self.processor.flip_image(direction)
+            self.display_image()
+            self.update_status(f"Flipped {direction}")
+    
+    def apply_resize(self) -> None:
+       
+        if self.check_image_loaded():
+            scale = int(self.resize_slider.get())
+            self.save_to_history(f"Resize ({scale}%)")
+            self.processor.resize_image(scale)
+            self.display_image()
+            self.update_status(f"Resized to {scale}%")
+    
+    #  View operations
+    
+    def zoom_in(self) -> None:
+     
+        if self.processor.get_current_image() is not None:
+            self.zoom_level = min(self.zoom_level * 1.25, 5.0)
+            self.display_image()
+    
+    def zoom_out(self) -> None:
+  
+        if self.processor.get_current_image() is not None:
+            self.zoom_level = max(self.zoom_level / 1.25, 0.1)
+            self.display_image()
+    
+    def fit_to_window(self) -> None:
+   
+        if self.processor.get_current_image() is not None:
+            self.zoom_level = 1.0
+            self.display_image()
+    
+    def toggle_info_panel(self) -> None:
+      
+        pass
+    
+    def toggle_history_panel(self) -> None:
+        
+        pass
+    
+    #  Dialog methods
+    
+    def show_blur_dialog(self) -> None:
+ 
+        if not self.check_image_loaded():
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Blur Options")
+        dialog.geometry("350x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Blur Settings", 
+                 font=('Arial', 12, 'bold')).pack(pady=10)
+        
+        ttk.Label(dialog, text="Intensity:").pack()
+        intensity_var = tk.IntVar(value=5)
+        ttk.Scale(dialog, from_=1, to=25, variable=intensity_var,
+                 orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
+        
+        intensity_label = ttk.Label(dialog, text="5")
+        intensity_label.pack()
+        
+        def update_label(val):
+            intensity_label.config(text=str(int(float(val))))
+        
+        def apply_and_close():
+            self.save_to_history(f"Blur ({intensity_var.get()})")
+            self.processor.apply_blur(intensity_var.get())
+            self.display_image()
+            dialog.destroy()
+        
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=20)
+        ttk.Button(button_frame, text="Apply", command=apply_and_close).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def show_brightness_contrast_dialog(self) -> None:
+   
+        if not self.check_image_loaded():
+            return
+        
+       
+        messagebox.showinfo("Info", "Use the sliders in the control panel")
+    
+    def show_saturation_dialog(self) -> None:
+
+        if not self.check_image_loaded():
+            return
+        
+        messagebox.showinfo("Info", "Use the saturation slider in the control panel")
+    
+    def show_resize_dialog(self) -> None:
+
+        if not self.check_image_loaded():
+            return
+        
+        messagebox.showinfo("Info", "Use the resize slider in the control panel")
+    
+    def show_image_properties(self) -> None:
+        info = self.processor.get_image_info()
+        if not info:
+            messagebox.showwarning("Warning", "No image loaded")
+            return
+        
+        props_dialog = tk.Toplevel(self.root)
+        props_dialog.title("Image Properties")
+        props_dialog.geometry("450x400")
+        props_dialog.transient(self.root)
+        
+        text_widget = scrolledtext.ScrolledText(props_dialog, wrap=tk.WORD)
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        properties_text = f"""IMAGE PROPERTIES
+{'=' * 50}
+
+File Information:
+  Filename: {info['filename']}
+  Path: {info.get('filepath', 'N/A')}
+  File Size: {info.get('file_size', 0) / 1024:.2f} KB
+
+Image Specifications:
+  Dimensions: {info['width']} × {info['height']} pixels
+  Color Channels: {info['channels']}
+  Total Pixels: {info['total_pixels']:,}
+  Bit Depth: {info['dtype']}
+  Memory Usage: {info['memory_size'] / 1024 / 1024:.2f} MB
+
+Original Information:
+  Original Size: {info.get('original_dimensions', ('N/A', 'N/A'))[0]} × {info.get('original_dimensions', ('N/A', 'N/A'))[1]} pixels
+  Load Time: {info.get('load_time', 'N/A')}
+
+Processing History:
+{chr(10).join('  • ' + h for h in self.processor.processing_history[-10:])}
+"""
+        
+        text_widget.insert(1.0, properties_text)
+        text_widget.config(state='disabled')
+        
+        ttk.Button(props_dialog, text="Close", 
+                  command=props_dialog.destroy).pack(pady=10)
+    
+    def show_user_guide(self) -> None:
+        """Show user guide dialog."""
+        guide_dialog = tk.Toplevel(self.root)
+        guide_dialog.title("User Guide")
+        guide_dialog.geometry("600x500")
+        guide_dialog.transient(self.root)
+        
+        text_widget = scrolledtext.ScrolledText(guide_dialog, wrap=tk.WORD)
+        text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        guide_text = """IMAGE PROCESSING STUDIO - USER GUIDE
+{'=' * 60}
+
+GETTING STARTED:
+1. Open an image: File → Open (Ctrl+O)
+2. Apply filters and effects using the control panel
+3. Save your work: File → Save (Ctrl+S)
+
+
+"""
+        
+        text_widget.insert(1.0, guide_text)
+        text_widget.config(state='disabled')
+        
+        ttk.Button(guide_dialog, text="Close", 
+                  command=guide_dialog.destroy).pack(pady=10)
+    
+    def show_shortcuts(self) -> None:
+        """Show keyboard shortcuts reference."""
+        shortcuts_text = """KEYBOARD SHORTCUTS
+
+File Operations:
+  Ctrl+O          Open image
+  Ctrl+S          Save
+  Ctrl+Shift+S    Save As
+
+Edit Operations:
+  Ctrl+Z          Undo
+  Ctrl+Y          Redo
+  Ctrl+R          Reset to original
+
+View Operations:
+  Ctrl++          Zoom in
+  Ctrl+-          Zoom out
+  Ctrl+0          Fit to window
+
+Help:
+  F1              Show user guide
+"""
+        messagebox.showinfo("Keyboard Shortcuts", shortcuts_text)
+    
+    def show_about(self) -> None:
+       
+        about_text = """Image Processing Studio by Group 37"""
+        messagebox.showinfo("About", about_text)
+    
+    # Utility Methods
+    
+    def check_image_loaded(self) -> bool:
+       
+        if self.processor.get_current_image() is None:
+            messagebox.showwarning("Warning", 
+                                 "Please load an image first\n(File → Open or Ctrl+O)")
+            return False
+        return True
+
+
+def main():
+   
+    root = tk.Tk()
+    app = ImageProcessorApp(root)
+    
+    root.update_idletasks()
+    width = root.winfo_width()
+    height = root.winfo_height()
+    x = (root.winfo_screenwidth() // 2) - (width // 2)
+    y = (root.winfo_screenheight() // 2) - (height // 2)
+    root.geometry(f'{width}x{height}+{x}+{y}')
+    
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
